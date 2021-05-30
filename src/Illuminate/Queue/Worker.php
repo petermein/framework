@@ -11,6 +11,7 @@ use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Queue\Events\Looping;
+use Illuminate\Queue\Events\WorkerException;
 use Illuminate\Queue\Events\WorkerStopping;
 use Illuminate\Support\Carbon;
 use Throwable;
@@ -342,6 +343,8 @@ class Worker
 
             $this->stopWorkerIfLostConnection($e);
 
+            $this->raiseWorkerExceptionEvent($e);
+
             $this->sleep(1);
         }
     }
@@ -362,6 +365,8 @@ class Worker
             $this->exceptions->report($e);
 
             $this->stopWorkerIfLostConnection($e);
+
+            $this->raiseWorkerExceptionEvent($e);
         }
     }
 
@@ -508,6 +513,17 @@ class Worker
         if (! $job->retryUntil() && $maxTries > 0 && $job->attempts() >= $maxTries) {
             $this->failJob($job, $e);
         }
+    }
+
+    /**
+     * Stop the worker if events return fail.
+     *
+     * @param  \Throwable  $e
+     * @return void
+     */
+    protected function raiseWorkerExceptionEvent($e)
+    {
+        $this->events->dispatch(new WorkerException($e, $this));
     }
 
     /**
